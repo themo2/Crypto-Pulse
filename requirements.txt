@@ -1,0 +1,11 @@
+kafka-python
+websocket-client
+psycopg2-binary
+pandas
+pyspark
+requests
+streamlit
+plotly
+sqlalchemy
+docker
+
