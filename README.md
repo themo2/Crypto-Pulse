@@ -48,7 +48,7 @@ It streams live 1-minute candlestick (OHLC) and real-time ticker data for the to
 | :--- | :--- |
 | **Streaming & Ingestion** | Python 3.11, Binance WebSocket API, `websocket-client`, `requests` |
 | **Message Broker** | Apache Kafka 4.0 (KRaft Mode), `kafka-python`, Kafka UI |
-| **Database & Storage** | PostgreSQL 16, SQLAlchemy, `psycopg2`, pgAdmin 4 |
+| **Database & Storage** | PostgreSQL 16, pgAdmin 4 |
 | **Distributed Processing & ML** | Apache Spark 3.5, PySpark MLlib (GBTClassifier, VectorAssembler) |
 | **Orchestration** | Apache Airflow 2.8, BashOperator, SQLCheckOperator, TriggerDagRunOperator |
 | **Frontend / Visualization** | Streamlit 1.30, Plotly Graph Objects, Pandas |
@@ -177,7 +177,6 @@ Navigate to [http://localhost:8501](http://localhost:8501) in your browser to vi
 | DAG ID | Schedule | Purpose |
 | :--- | :--- | :--- |
 | `master_crypto_orchestrator` | Manual / External | Master DAG triggering gap filling, quality validation, and model retraining in sequence. |
-| `crypto_gap_filler_dag` | `*/10 * * * *` | Executes `update_db.py` every 10 minutes to maintain complete candle history. |
 | `crypto_data_quality_dag` | `0 2 * * *` | Runs SQL integrity checks to ensure zero NULL close prices or volumes exist. |
 | `crypto_gbt_retrain_dag` | Manual / Weekly | Triggers `spark/retrain_model.py` to retrain the GBT classifier on updated data. |
 
