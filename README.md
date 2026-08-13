@@ -16,7 +16,56 @@ It streams live 1-minute candlestick (OHLC) and real-time ticker data for the to
 
 ## 📐 Architecture Overview
 
-![Project flow](media/38516275-9fcc-47c8-861b-1703fbeb58c4.jpg)
+```mermaid
+flowchart TD
+    subgraph Ingestion ["1. Data Ingestion & Live Producer"]
+        BWS["Binance WebSocket Stream\n(Live Ticker & 1m Klines)"]
+        BAPI["Binance REST API\n(Historical Gap Backfill)"]
+        PROD["Python Stream Producer\n(producer/producer.py)"]
+        BWS --> PROD
+        BAPI --> PROD
+    end
+
+    subgraph Streaming ["2. Messaging & Event Bus"]
+        KAFKA["Apache Kafka Cluster\nTopic: top10-crypto-live"]
+        KUI["Kafka UI\n(Port 8081)"]
+        PROD -->|"Publish Tickers & Candles"| KAFKA
+        KAFKA --- KUI
+    end
+
+    subgraph Storage ["3. Database & Storage"]
+        PG["PostgreSQL 16 Database\nTable: historical_prices_1m"]
+        PGADM["pgAdmin 4\n(Port 5050)"]
+        PROD -->|"Direct Upsert Closed Candles"| PG
+        PG --- PGADM
+    end
+
+    subgraph Processing ["4. Distributed Analytics & ML"]
+        SPARK["PySpark Engine\n(Feature Engineering & GBT Model)"]
+        PG -->|"Batch & Window Reads"| SPARK
+        SPARK -->|"Export Model Artifacts"| MODELS["models/crypto_gbt_model"]
+    end
+
+    subgraph Orchestration ["5. Workflow Orchestration"]
+        AIRFLOW["Apache Airflow 2.8\n(Port 8080)"]
+        DAG1["master_crypto_orchestrator"]
+        DAG2["crypto_gap_filler_dag"]
+        DAG3["crypto_data_quality_dag"]
+        DAG4["crypto_gbt_retrain_dag"]
+        AIRFLOW --- DAG1
+        AIRFLOW --- DAG2
+        AIRFLOW --- DAG3
+        AIRFLOW --- DAG4
+        DAG2 -->|"Triggers Gap Fill"| PG
+        DAG4 -->|"Triggers PySpark Training"| SPARK
+    end
+
+    subgraph Presentation ["6. Real-Time UI Dashboard"]
+        ST["Streamlit Interactive App\n(Port 8501)"]
+        KAFKA -->|"Low-Latency Kafka Consumer"| ST
+        PG -->|"Seed Chart History"| ST
+    end
+```
 
 ---
 

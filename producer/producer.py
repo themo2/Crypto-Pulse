@@ -31,16 +31,23 @@ STREAM_URL = "wss://stream.binance.com:9443/stream?streams=" + "/".join(streams)
 
 
 print("🔄 Connecting to Kafka Server...")
-try:
-    bootstrap_servers = ["kafka:29092", "cryptopulse-kafka:29092"]
-    producer = KafkaProducer(
-        bootstrap_servers=bootstrap_servers,
-        value_serializer=lambda v: json.dumps(v).encode('utf-8')
-    )
-    print("✅ Connected to Kafka Successfully!")
-except Exception as e:
-    print(f"❌ Failed to connect to Kafka. Error: {e}")
-    sys.exit()
+producer = None
+bootstrap_servers = ["kafka:29092", "cryptopulse-kafka:29092"]
+for i in range(30):
+    try:
+        producer = KafkaProducer(
+            bootstrap_servers=bootstrap_servers,
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
+        print("✅ Connected to Kafka Successfully!")
+        break
+    except Exception as e:
+        print(f"⏳ Kafka not ready yet (attempt {i+1}/30). Retrying in 2 seconds... ({e})")
+        time.sleep(2)
+
+if not producer:
+    print("❌ Failed to connect to Kafka after multiple retries. Exiting.")
+    sys.exit(1)
 
 KAFKA_TOPIC = "top10-crypto-live"
 DB_URL = URL.create(
@@ -52,7 +59,22 @@ DB_URL = URL.create(
     database=os.getenv("DB_NAME", "cryptopulse_db"),
 )
 DB_ENGINE = create_engine(DB_URL)
-HISTORICAL_PRICES = Table("historical_prices_1m", MetaData(), autoload_with=DB_ENGINE)
+
+print("🔄 Connecting to Postgres Database...")
+HISTORICAL_PRICES = None
+for i in range(30):
+    try:
+        HISTORICAL_PRICES = Table("historical_prices_1m", MetaData(), autoload_with=DB_ENGINE)
+        print("✅ Connected to Postgres Successfully!")
+        break
+    except Exception as e:
+        print(f"⏳ Postgres not ready yet (attempt {i+1}/30). Retrying in 2 seconds... ({e})")
+        time.sleep(2)
+
+if HISTORICAL_PRICES is None:
+    print("❌ Failed to connect to Postgres after multiple retries. Exiting.")
+    sys.exit(1)
+
 BINANCE_URL = os.getenv("BINANCE_API_URL", "https://data-api.binance.vision/api/v3/klines")
 BINANCE_FALLBACK_URL = "https://api.binance.com/api/v3/klines"
 BINANCE_INTERVAL = "1m"

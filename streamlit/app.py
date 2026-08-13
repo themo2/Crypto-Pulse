@@ -153,6 +153,19 @@ with col1:
 with col2:
     candle_count = st.selectbox("Candles Displayed", [30, 50, 100, 200], index=2)
 
+def compute_ai_prediction(df):
+    if df.empty or len(df) < 2:
+        return "Evaluating..."
+    try:
+        latest = df.iloc[-1]
+        price_change_pct = (latest["close"] - latest["open"]) / latest["open"] if latest["open"] else 0.0
+        rolling_avg_15m = df["close"].tail(15).mean()
+        ma_diff = latest["close"] - rolling_avg_15m
+        score = (0.5 * price_change_pct) + (0.3 * (ma_diff / (rolling_avg_15m + 1e-6)))
+        return "UP 📈" if score >= 0 else "DOWN 📉"
+    except Exception:
+        return "Evaluating..."
+
 @st.fragment(run_every="1s")
 def candlestick_dashboard():
     try:
@@ -195,7 +208,7 @@ def candlestick_dashboard():
         difference = latest["close"] - previous_close
         percentage = (difference / previous_close) * 100 if previous_close else 0
 
-        m1, m2, m3, m4, m5 = st.columns(5)
+        m1, m2, m3, m4, m5, m6 = st.columns(6)
 
         m1.metric("Close", f"${latest['close']:,.4f}", f"{percentage:+.3f}%")
         m2.metric("Open", f"${latest['open']:,.4f}")
@@ -207,6 +220,9 @@ def candlestick_dashboard():
             m5.metric("Candle Status", status)
         else:
             m5.metric("Candle Status", "Kafka Streaming...")
+
+        ai_signal = compute_ai_prediction(df)
+        m6.metric("AI Prediction", ai_signal)
 
         # CANDLESTICK CHART DIRECTLY FROM KAFKA
         fig = go.Figure(

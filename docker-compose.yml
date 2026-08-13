@@ -11,28 +11,57 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  airflow:
-    image: apache/airflow:2.8.1
-    container_name: cryptopulse-airflow
+  airflow-init:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: cryptopulse-airflow-init
     depends_on:
       - postgres
     environment:
-      # 1. The Airflow Metadata DB (This stops the SQLite crashes)
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://cryptopulse:cryptopulse123@cryptopulse-postgres:5432/cryptopulse_db"
-      
-      # 2. The Connection for your DAGs to use
-      AIRFLOW_CONN_POSTGRES_CRYPTOPULSE: "postgres://cryptopulse:cryptopulse123@cryptopulse-postgres:5432/cryptopulse_db"
-      
-      # 3. Security and Admin Setup
       _AIRFLOW_WWW_USER_CREATE: "true"
       _AIRFLOW_WWW_USER_USERNAME: "admin"
       _AIRFLOW_WWW_USER_PASSWORD: "admin123"
+    command: >
+      bash -c "airflow db migrate && airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@cryptopulse.com --password admin123 || true"
+
+  airflow-webserver:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: cryptopulse-airflow-webserver
+    restart: always
+    depends_on:
+      - postgres
+      - airflow-init
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://cryptopulse:cryptopulse123@cryptopulse-postgres:5432/cryptopulse_db"
+      AIRFLOW_CONN_POSTGRES_CRYPTOPULSE: "postgres://cryptopulse:cryptopulse123@cryptopulse-postgres:5432/cryptopulse_db"
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__FERNET_KEY: "J281G1zkMlSEL1S3QxNn5H-mAWH1ib40gNj14IqgoJQ="
-      _PIP_ADDITIONAL_REQUIREMENTS: "kafka-python pyspark websocket-client requests pandas sqlalchemy psycopg2-binary docker"
-      AIRFLOW__WEBSERVER__WEB_SERVER_WORKER_TIMEOUT: 300
     ports:
       - "8080:8080"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+    command: webserver
+
+  airflow-scheduler:
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    container_name: cryptopulse-airflow-scheduler
+    restart: always
+    depends_on:
+      - postgres
+      - airflow-init
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://cryptopulse:cryptopulse123@cryptopulse-postgres:5432/cryptopulse_db"
+      AIRFLOW_CONN_POSTGRES_CRYPTOPULSE: "postgres://cryptopulse:cryptopulse123@cryptopulse-postgres:5432/cryptopulse_db"
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__FERNET_KEY: "J281G1zkMlSEL1S3QxNn5H-mAWH1ib40gNj14IqgoJQ="
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -42,9 +71,7 @@ services:
       - ./models:/opt/airflow/models    
       - ./spark:/opt/airflow/spark     
       - /var/run/docker.sock:/var/run/docker.sock
-      
-    command: standalone
-
+    command: scheduler
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: cryptopulse-pgadmin
