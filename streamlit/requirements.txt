@@ -5,3 +5,4 @@ kafka-python
 psycopg2-binary
 sqlalchemy
 requests
+pyspark
